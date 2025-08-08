@@ -13,6 +13,7 @@ from group_selfies import GroupGrammar, Group
 
 device = ("cuda" if torch.cuda.is_available() else "cpu")
 
+# add a prefix of tokens that specify the desired properties
 def get_property_token_prefix(vals_list, stats_dict, prop_token_dict):
     propval_tokens = prop_token_dict["propval_tokens"]
 
@@ -20,8 +21,9 @@ def get_property_token_prefix(vals_list, stats_dict, prop_token_dict):
 
     for prop, val in vals_list:
         m, std, pmin, pmax = stats_dict[prop]
-        prop_val = (val - m) / std
+        prop_val = (val - m) / std # standardize the property value
 
+        # get the property val ("[PV##]") token that specifies the value
         propval_token_index = int(((prop_val - pmin) / (pmax - pmin)) * len(propval_tokens))
 
         if propval_token_index < 0:
@@ -73,12 +75,12 @@ def generate_conditional(
     return generated_molecules
 
 def generate_molecules_from_properties(
-    model_path: str,
+    model_path: str, # path to the directory containing the model files
     tpsa: float=None,
     qed: float=None,
     sas: float=None,
     logp: float=None,
-    n: int=1000,
+    n: int=1000, # number of molecules to be generated
     property_tokens_path: str="property_tokens.json",
     vocab_path: str="vocab.json",
     stats_path: str="zinc250k_stats.json"
@@ -110,12 +112,14 @@ def generate_molecules_from_properties(
     if logp is not None:
         prop_vals.append(("logp", logp))
 
+    # get the property token prefix
     prefix = get_property_token_prefix(
         prop_vals,
         stats_dict,
         prop_tokens_dict
     )
 
+    # generate
     gs_gen = generate_conditional(
         model.to(device),
         tokenizer,
@@ -123,6 +127,7 @@ def generate_molecules_from_properties(
         n
     )
 
+    # convert to SMILES
     grammar = GroupGrammar([Group(fragname, smiles) for fragname, smiles in vocab_dict.items()])
 
     mols = [grammar.decoder(gs) for gs in gs_gen]
